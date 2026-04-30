@@ -1,0 +1,7 @@
+# SOPS
+.decrypted~*.yaml
+.DS_Store
+settings.json
+*old*
+tmp
+kube-ps1.sh
