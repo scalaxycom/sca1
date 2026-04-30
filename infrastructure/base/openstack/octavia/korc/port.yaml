@@ -1,0 +1,126 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Port
+metadata:
+  name: octavia-health-manager-port-${CN}n1
+  namespace: openstack 
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    networkRef: lb-mgmt-net
+    description: ports for health manager
+    tags:
+      - octavia
+    addresses:
+      - ip: 172.31.1.10
+        subnetRef: lb-mgmt-subnet
+    securityGroupRefs:
+      - lb-health-mgr-sec-grp
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Port
+metadata:
+  name: octavia-health-manager-port-${CN}n2
+  namespace: openstack 
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    networkRef: lb-mgmt-net
+    description: ports for health manager
+    tags:
+      - octavia
+    addresses:
+      - ip: 172.31.2.10
+        subnetRef: lb-mgmt-subnet
+    securityGroupRefs:
+      - lb-health-mgr-sec-grp
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Port
+metadata:
+  name: octavia-health-manager-port-${CN}n3
+  namespace: openstack 
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    networkRef: lb-mgmt-net
+    description: ports for health manager
+    tags:
+      - octavia
+    addresses:
+      - ip: 172.31.3.10
+        subnetRef: lb-mgmt-subnet
+    securityGroupRefs:
+      - lb-health-mgr-sec-grp
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Port
+metadata:
+  name: octavia-worker-port-${CN}n1
+  namespace: openstack
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    networkRef: lb-mgmt-net
+    description: ports for health manager
+    tags:
+      - octavia
+    addresses:
+      - subnetRef: lb-mgmt-subnet
+      - ip: 172.31.1.11
+        subnetRef: lb-mgmt-subnet
+    securityGroupRefs:
+      - lb-health-mgr-sec-grp
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Port
+metadata:
+  name: octavia-worker-port-${CN}n2
+  namespace: openstack
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    networkRef: lb-mgmt-net
+    description: ports for health manager
+    tags:
+      - octavia
+    addresses:
+      - ip: 172.31.2.11
+        subnetRef: lb-mgmt-subnet
+    securityGroupRefs:
+      - lb-health-mgr-sec-grp
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Port
+metadata:
+  name: octavia-worker-port-${CN}n3
+  namespace: openstack
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    networkRef: lb-mgmt-net
+    description: ports for health manager
+    tags:
+      - octavia
+    addresses:
+      - ip: 172.31.3.11
+        subnetRef: lb-mgmt-subnet
+    securityGroupRefs:
+      - lb-health-mgr-sec-grp

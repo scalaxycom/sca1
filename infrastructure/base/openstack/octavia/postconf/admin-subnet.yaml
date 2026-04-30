@@ -1,0 +1,22 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Subnet
+metadata:
+  name: admin-subnet
+  namespace: openstack  
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    networkRef: admin-network
+    dnsNameservers: 
+      - "8.8.8.8"
+      - "1.1.1.1"
+    description: |
+      Admin network subnet
+    tags:
+    - admin
+    ipVersion: 4
+    cidr: 192.168.0.0/24
+    routerRef: admin-router

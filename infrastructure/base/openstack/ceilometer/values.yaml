@@ -1,0 +1,185 @@
+images:
+  tags:
+    test: null
+    db_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ceilometer_db_sync: "quay.io/rackspace/rackerlabs-ceilometer:2024.1-ubuntu_jammy"
+    rabbit_init: docker.io/rabbitmq:3.13-management
+    ks_user: "ghcr.io/rackerlabs/genestack-images/heat:2024.1-latest"
+    ks_service: "ghcr.io/rackerlabs/genestack-images/heat:2024.1-latest"
+    ceilometer_api: "quay.io/rackspace/rackerlabs-ceilometer:2024.1-ubuntu_jammy" 
+    ceilometer_central: "quay.io/rackspace/rackerlabs-ceilometer:2024.1-ubuntu_jammy"
+    ceilometer_collector: "quay.io/rackspace/rackerlabs-ceilometer:2024.1-ubuntu_jammy"
+    ceilometer_compute: "quay.io/rackspace/rackerlabs-ceilometer:2024.1-ubuntu_jammy"
+    ceilometer_ipmi: "quay.io/rackspace/rackerlabs-ceilometer:2024.1-ubuntu_jammy"
+    ceilometer_notification: "quay.io/rackspace/rackerlabs-ceilometer:2024.1-ubuntu_jammy"
+    dep_check: "ghcr.io/rackerlabs/genestack-images/kubernetes-entrypoint:latest"
+    image_repo_sync: null
+  pull_policy: "Always" 
+
+#pod:
+#  replicas:
+#    server: 1
+
+conf:
+  ceilometer:
+    DEFAULT:
+      debug: "false"
+      # NOTE: If you need to enable debug, it is highly recommended to uncomment the below lines
+      # to ensure logs are ceilometer does not spam the logs
+      #      default_log_levels: >-
+      #        amqp=WARN,amqplib=WARN,boto=WARN,qpid=WARN,sqlalchemy=WARN,suds=INFO,oslo.messaging=INFO,
+      #        oslo_messaging=INFO,iso8601=WARN,requests.packages.urllib3.connectionpool=DEBUG,
+      #        urllib3.connectionpool=DEBUG,websocket=WARN,requests.packages.urllib3.util.retry=DEBUG,
+      #        urllib3.util.retry=DEBUG,keystonemiddleware=WARN,routes.middleware=WARN,stevedore=WARN,
+      #        taskflow=WARN,keystoneauth=WARN,oslo.cache=INFO,oslo_policy=INFO,dogpile.core.dogpile=INFO
+      event_dispatchers:
+        type: multistring
+        values:
+          - gnocchi
+      meter_dispatchers:
+        type: multistring
+        values:
+          - gnocchi
+    api:
+      aodh_is_enabled: "True"
+      gnocchi_is_enabled: "True"
+    notification:
+      messaging_urls:
+        type: multistring
+        values:
+          - rabbit://rabbitmq:${rabbitmq_admin_password}@rabbitmq.openstack.svc.cluster.local:5672/ceilometer
+          - rabbit://rabbitmq:${rabbitmq_admin_password}@rabbitmq.openstack.svc.cluster.local:5672/cinder
+          - rabbit://rabbitmq:${rabbitmq_admin_password}@rabbitmq.openstack.svc.cluster.local:5672/glance
+          - rabbit://rabbitmq:${rabbitmq_admin_password}@rabbitmq.openstack.svc.cluster.local:5672/nova
+          - rabbit://rabbitmq:${rabbitmq_admin_password}@rabbitmq.openstack.svc.cluster.local:5672/keystone
+          - rabbit://rabbitmq:${rabbitmq_admin_password}@rabbitmq.openstack.svc.cluster.local:5672/neutron
+          - rabbit://rabbitmq:${rabbitmq_admin_password}@rabbitmq.openstack.svc.cluster.local:5672/heat
+    oslo_messaging_notifications:
+      driver: messagingv2
+      topics:
+        - notifications
+        - profiler
+    oslo_concurrency:
+      lock_path: /tmp/ceilometer
+    oslo_messaging_rabbit:
+      amqp_durable_queues: false
+      rabbit_ha_queues: false
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: false
+      use_queue_manager: false
+      rabbit_interval_max: 10
+      # Send more frequent heartbeats and fail unhealthy nodes faster
+      # heartbeat_timeout / heartbeat_rate / 2.0 = 30 / 3 / 2.0 = 5
+      # https://opendev.org/openstack/oslo.messaging/commit/36fb5bceabe08a982ebd52e4a8f005cd26fdf6b8
+      heartbeat_rate: 3
+      heartbeat_timeout_threshold: 60
+      # DEPRECIATION:  (warning) heartbeat_in_pthread will be deprecated in 2024.2
+      heartbeat_in_pthread: true
+      # Setting lower kombu_reconnect_delay should resolve issue with HA failing when one node is down
+      # https://lists.openstack.org/pipermail/openstack-discuss/2023-April/033314.html
+      # https://review.opendev.org/c/openstack/oslo.messaging/+/866617
+      kombu_reconnect_delay: 0.5
+
+dependencies:
+  static:
+    central:
+      jobs:
+        - ceilometer-db-sync
+        - ceilometer-ks-user
+        - ceilometer-rabbit-init
+      services:
+        - endpoint: internal
+          service: identity
+        - endpoint: internal
+          service: metric
+    ipmi:
+      jobs:
+        - ceilometer-db-sync
+        - ceilometer-ks-user
+        - ceilometer-rabbit-init
+      services:
+        - endpoint: internal
+          service: identity
+        - endpoint: internal
+          service: metric
+    compute:
+      jobs:
+        - ceilometer-db-sync
+        - ceilometer-ks-user
+        - ceilometer-rabbit-init
+      services:
+        - endpoint: internal
+          service: identity
+        - endpoint: internal
+          service: metric
+    db_sync:
+      jobs: []
+      services: []
+    rabbit_init:
+      services:
+      - service: oslo_messaging
+        endpoint: internal
+    notification:
+      jobs:
+        - ceilometer-db-sync
+        - ceilometer-ks-user
+        - ceilometer-rabbit-init
+      services:
+        - endpoint: internal
+          service: identity
+        - endpoint: internal
+          service: metric
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      ceilometer:
+        password: ${ceilometer_admin_password}
+      test:
+        password: ${ceilometer_test_password}      
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      ceilometer:
+        password: ${ceilometer_db_password}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      ceilometer:
+        password: ${ceilometer_rabbitmq_password}
+  metering:
+    host_fqdn_override:
+      public:
+        host: "ceilometer.${HOST}"
+        # tls:
+        #   secretName: ingress-cert
+        #   issuerRef:
+        #     kind: ClusterIssuer
+        #     name: letsencrypt
+
+# secrets:
+#   tls:
+#     metering:
+#       ceilometer:
+#         public: ingress-cert
+
+manifests:
+  deployment_api: false
+  deployment_collector: false
+  ingress_api: false
+  # using gnocchi so no db init
+  job_rabbit_init: true
+  job_db_init: false
+  job_db_init_mongodb: false
+  job_ks_endpoints: false
+  job_ks_service: false
+  secret_mongodb: false
+  secret_rabbitmq: true
+  service_ingress_api: false

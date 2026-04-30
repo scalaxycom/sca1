@@ -1,0 +1,40 @@
+images:
+  tags:
+    skyline_db_sync: quay.io/airshipit/skyline:latest
+    skyline: quay.io/airshipit/skyline:latest
+    db_init: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    dep_check: 'quay.io/airshipit/kubernetes-entrypoint:latest-${OPENSTACK_DIST}'
+    ks_user: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+
+#pod:
+#  replicas:
+#    server: 1
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      skyline:
+        password: ${skyline_admin_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      skyline:
+        password: ${skyline_db_password}
+  skyline:
+    host_fqdn_override:
+      public:
+        host: "skyline.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            kind: ClusterIssuer
+            name: letsencrypt
+
+secrets:
+  tls:
+    skyline:
+      skyline:
+        public: ingress-cert

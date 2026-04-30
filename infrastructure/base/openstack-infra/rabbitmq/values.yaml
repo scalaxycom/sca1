@@ -1,0 +1,27 @@
+images:
+  tags:
+    rabbitmq_init: quay.io/airshipit/openstack-client:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+
+pod:
+  replicas:
+    server: 3
+
+endpoints:
+  oslo_messaging:
+    auth:
+      user:
+        username: rabbitmq
+        password: ${rabbitmq_admin_password}
+      guest:
+        password: ${rabbitmq_guest_password}
+    statefulset:
+      replicas: 3
+
+monitoring:
+  prometheus:
+    enabled: True
+
+volume:
+  enabled: true
+  class_name: "openebs-hostpath"
+  size: 2Gi

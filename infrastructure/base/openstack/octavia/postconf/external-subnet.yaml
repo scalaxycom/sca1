@@ -1,0 +1,45 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Subnet
+metadata:
+  name: external-subnet
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: unmanaged
+  import:
+    filter:
+      networkRef: external-network
+      ipVersion: 4
+
+# apiVersion: openstack.k-orc.cloud/v1alpha1
+# kind: Subnet
+# metadata:
+#   name: external-subnet
+#   namespace: openstack  
+# spec:
+#   cloudCredentialsRef:
+#     cloudName: cloudname
+#     secretName: openstack-clouds
+#   managementPolicy: managed
+#   managedOptions:
+#     onDelete: detach
+#   resource:
+#     networkRef: external-network
+#     description: External IPv4 Subnet
+#     tags:
+#       - octavia
+#     ipVersion: 4
+#     cidr: ${EXTERTAL_NETWORK_RANGE}
+#     allocationPools:
+#       - start: ${EXTERTAL_NETWORK_START}
+#         end: ${EXTERNAL_NETWORK_END}
+#     gateway:
+#       type: IP
+#       ip: ${EXTERTAL_NETWORK_GW}
+#     enableDHCP: false
+#     dnsNameservers:
+#       - 8.8.8.8
+#       - 1.1.1.1
+#     dnsPublishFixedIP: false
+#     projectRef: admin

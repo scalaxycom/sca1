@@ -1,0 +1,16 @@
+admissionController:
+  replicas: 3
+backgroundController:
+  replicas: 3 
+cleanupController:
+  replicas: 2
+reportsController: 
+  replicas: 2
+
+grafana:
+  enabled: true
+  namespace: monitoring
+
+serviceMonitor:
+  enabled: true
+  namespace: monitoring

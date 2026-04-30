@@ -1,0 +1,15 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Network
+metadata:
+  name: admin-network
+  namespace: openstack  
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    description: |
+      Admin network
+    tags:
+    - admin

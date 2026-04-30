@@ -1,0 +1,28 @@
+image:
+  tag: ${ROOK_RELEASE}
+crds:
+  enabled: true
+
+
+# nodeSelector:
+#   rook-ceph-operator: "true"
+#  logLevel: DEBUG
+csi:
+  enableRbdDriver: true
+  enableCephfsDriver: false
+  # set to false to disable deployment of snapshotter container in CephFS provisioner pod.
+  enableCephfsSnapshotter: false
+  # set to false to disable deployment of snapshotter container in NFS provisioner pod.
+  enableNFSSnapshotter: false
+  clusterName: ceph
+  topology:
+    enabled: true
+    # domainLabels define which node labels to use as domains
+    # for CSI nodeplugins to advertise their domains
+    # NOTE: the value here serves as an example and needs to be
+    # updated with node labels that define domains of interest
+    # domainLabels:
+    # - kubernetes.io/hostname
+    # - topology.kubernetes.io/zone
+    # - topology.rook.io/rack
+#enableDiscoveryDaemon: true

@@ -1,0 +1,13 @@
+images:
+  tags:
+    prometheus_openstack_exporter: quay.io/airshipit/prometheus-openstack-exporter:latest-${OPENSTACK_DIST}
+    ks_user: "quay.io/airshipit/openstack-client:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      user:
+        password: ${prometheus_openstack_exporter_admin_password}

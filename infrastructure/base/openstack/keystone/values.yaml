@@ -1,0 +1,69 @@
+images:
+  tags:
+    bootstrap: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_drop: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_api: "quay.io/airshipit/keystone:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_bootstrap: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_credential_rotate: "quay.io/airshipit/keystone:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_credential_setup: "quay.io/airshipit/keystone:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_db_sync: "quay.io/airshipit/keystone:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_domain_manage: "quay.io/airshipit/keystone:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_fernet_rotate: "quay.io/airshipit/keystone:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    keystone_fernet_setup: "quay.io/airshipit/keystone:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_user: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+
+endpoints:
+  identity:
+    name: keystone
+    namespace: openstack
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      test:
+        password: ${keystone_test_password}
+    host_fqdn_override:
+      public:
+        host: "keystone.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            name: letsencrypt
+            kind: ClusterIssuer
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      keystone:
+        password: ${keystone_db_password}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      keystone:
+        password: ${keystone_rabbitmq_password}
+    statefulset:
+      replicas: 3
+
+secrets:
+  tls:
+    identity:
+      api:
+        public: ingress-cert
+        internal: ingress-cert
+
+# network:
+#   api:
+#     ingress:
+#       public: false
+
+# tls:
+#   identity: false

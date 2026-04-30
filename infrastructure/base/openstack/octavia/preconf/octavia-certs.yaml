@@ -1,0 +1,320 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: octavia-certs
+  namespace: openstack
+spec:
+  template:
+    spec:
+      serviceAccountName: octavia-creator-sa
+      containers:
+      - name: generator
+        image: docker.io/bitnami/kubectl:latest
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            export NS="openstack"
+            export TMPDIR="/tmp"
+            export OPENSSL_CONF=$TMPDIR/openssl.cnf
+            export CA_PATH=dual_ca
+            
+            cd $TMPDIR 
+
+            tee $TMPDIR/openssl.cnf << 'EOF'
+            # OpenSSL root CA configuration file.
+
+            [ ca ]
+            # `man ca`
+            default_ca = CA_default
+
+            [ CA_default ]
+            # Directory and file locations.
+            dir               = ./
+            certs             = $dir/certs
+            crl_dir           = $dir/crl
+            new_certs_dir     = $dir/newcerts
+            database          = $dir/index.txt
+            serial            = $dir/serial
+            RANDFILE          = $dir/private/.rand
+
+            # The root key and root certificate.
+            private_key       = $dir/private/ca.key.pem
+            certificate       = $dir/certs/ca.cert.pem
+
+            # For certificate revocation lists.
+            crlnumber         = $dir/crlnumber
+            crl               = $dir/crl/ca.crl.pem
+            crl_extensions    = crl_ext
+            default_crl_days  = 30
+
+            # SHA-1 is deprecated, so use SHA-2 instead.
+            default_md        = sha256
+
+            name_opt          = ca_default
+            cert_opt          = ca_default
+            # 10 years
+            default_days      = 7300
+            preserve          = no
+            policy            = policy_strict
+
+            [ CA_intermediate ]
+            # Directory and file locations.
+            dir               = ./intermediate_ca
+            certs             = $dir/certs
+            crl_dir           = $dir/crl
+            new_certs_dir     = $dir/newcerts
+            database          = $dir/index.txt
+            serial            = $dir/serial
+            RANDFILE          = $dir/private/.rand
+
+            # The root key and root certificate.
+            private_key       = ./private/ca.key.pem
+            certificate       = ./certs/ca.cert.pem
+
+            # For certificate revocation lists.
+            crlnumber         = $dir/crlnumber
+            crl               = $dir/crl/ca.crl.pem
+            crl_extensions    = crl_ext
+            default_crl_days  = 30
+
+            # SHA-1 is deprecated, so use SHA-2 instead.
+            default_md        = sha256
+
+            name_opt          = ca_default
+            cert_opt          = ca_default
+            # 5 years
+            default_days      = 3650
+            preserve          = no
+            policy            = policy_strict
+
+            [ policy_strict ]
+            # The root CA should only sign intermediate certificates that match.
+            # See the POLICY FORMAT section of `man ca`.
+            countryName             = match
+            stateOrProvinceName     = match
+            organizationName        = match
+            organizationalUnitName  = optional
+            commonName              = supplied
+            emailAddress            = optional
+
+            [ req ]
+            # Options for the `req` tool (`man req`).
+            default_bits        = 2048
+            distinguished_name  = req_distinguished_name
+            string_mask         = utf8only
+
+            # SHA-1 is deprecated, so use SHA-2 instead.
+            default_md          = sha256
+
+            # Extension to add when the -x509 option is used.
+            x509_extensions     = v3_ca
+
+            [ req_distinguished_name ]
+            # See <https://en.wikipedia.org/wiki/Certificate_signing_request>.
+            countryName                     = Country Name (2 letter code)
+            stateOrProvinceName             = State or Province Name
+            localityName                    = Locality Name
+            0.organizationName              = Organization Name
+            organizationalUnitName          = Organizational Unit Name
+            commonName                      = Common Name
+            emailAddress                    = Email Address
+
+            # Optionally, specify some defaults.
+            countryName_default             = US
+            stateOrProvinceName_default     = Oregon
+            localityName_default            = Corvallis
+            0.organizationName_default      = OpenStack
+            organizationalUnitName_default  = Octavia
+            emailAddress_default            =
+            commonName_default              = example.org
+
+            [ v3_ca ]
+            # Extensions for a typical CA (`man x509v3_config`).
+            subjectKeyIdentifier = hash
+            authorityKeyIdentifier = keyid:always,issuer
+            basicConstraints = critical, CA:true
+            keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+            [ v3_intermediate_ca ]
+            # Extensions for a typical intermediate CA (`man x509v3_config`).
+            subjectKeyIdentifier = hash
+            authorityKeyIdentifier = keyid:always,issuer
+            basicConstraints = critical, CA:true, pathlen:0
+            keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+            [ usr_cert ]
+            # Extensions for client certificates (`man x509v3_config`).
+            basicConstraints = CA:FALSE
+            nsCertType = client, email
+            nsComment = "OpenSSL Generated Client Certificate"
+            subjectKeyIdentifier = hash
+            authorityKeyIdentifier = keyid,issuer
+            keyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment
+            extendedKeyUsage = clientAuth, emailProtection
+
+            [ server_cert ]
+            # Extensions for server certificates (`man x509v3_config`).
+            basicConstraints = CA:FALSE
+            nsCertType = server
+            nsComment = "OpenSSL Generated Server Certificate"
+            subjectKeyIdentifier = hash
+            authorityKeyIdentifier = keyid,issuer:always
+            keyUsage = critical, digitalSignature, keyEncipherment
+            extendedKeyUsage = serverAuth
+
+            [ crl_ext ]
+            # Extension for CRLs (`man x509v3_config`).
+            authorityKeyIdentifier=keyid:always
+            EOF
+
+            [[ -f "$TMPDIR/openssl.cnf" ]] && echo "openssl.conf created"
+
+            rm -rf $CA_PATH
+            mkdir $CA_PATH
+            chmod 700 $CA_PATH
+            cd $CA_PATH
+
+            mkdir -p etc/octavia/certs
+            chmod 700 etc/octavia/certs
+
+            ###### Client Root CA
+            mkdir client_ca
+            cd client_ca
+            mkdir certs crl newcerts private
+            chmod 700 private
+            touch index.txt
+            echo 1000 > serial
+
+            # Create the client CA private key
+            openssl genpkey -algorithm RSA -out private/ca.key.pem -aes-256-cbc -pkeyopt rsa_keygen_bits:4096 -pass pass:${octavia_certificates_password}
+            chmod 400 private/ca.key.pem
+
+            # Create the client CA root certificate
+            openssl req -config $OPENSSL_CONF -key private/ca.key.pem -new -x509 -sha256 -extensions v3_ca -days 7300 -out certs/ca.cert.pem -subj "/C=NL/ST=Amsterdam/L=CAmsterdam/O=OpenStack/OU=Octavia/CN=ClientRootCA" -passin pass:${octavia_certificates_password}
+
+            ###### Client Intermediate CA
+            mkdir intermediate_ca
+            mkdir intermediate_ca/certs intermediate_ca/crl intermediate_ca/newcerts intermediate_ca/private
+            chmod 700 intermediate_ca/private
+            touch intermediate_ca/index.txt
+            echo 1000 > intermediate_ca/serial
+
+            # Create the client intermediate CA private key
+            openssl genpkey -algorithm RSA -out intermediate_ca/private/intermediate.ca.key.pem -aes-256-cbc -pkeyopt rsa_keygen_bits:4096 -pass pass:${octavia_certificates_password}
+            chmod 400 intermediate_ca/private/intermediate.ca.key.pem
+
+            # Create the client intermediate CA certificate signing request
+            openssl req -config $OPENSSL_CONF -key intermediate_ca/private/intermediate.ca.key.pem -new -sha256 -out intermediate_ca/client_intermediate.csr -subj "/C=NL/ST=Amsterdam/L=CAmsterdam/O=OpenStack/OU=Octavia/CN=ClientIntermediateCA" -passin pass:${octavia_certificates_password}
+
+            # Create the client intermediate CA certificate
+            openssl ca -config $OPENSSL_CONF -name CA_intermediate -extensions v3_intermediate_ca -days 7300 -notext -md sha256 -in intermediate_ca/client_intermediate.csr -out intermediate_ca/certs/intermediate.cert.pem -passin pass:${octavia_certificates_password} -batch
+
+            # Create the client CA certificate chain
+            cat intermediate_ca/certs/intermediate.cert.pem certs/ca.cert.pem > intermediate_ca/ca-chain.cert.pem
+
+            ###### Create the client key and certificate
+            openssl genpkey -algorithm RSA -out intermediate_ca/private/controller.key.pem -aes-256-cbc -pass pass:${octavia_certificates_password}
+            chmod 400 intermediate_ca/private/controller.key.pem
+
+            # Create the client controller certificate signing request
+            openssl req -config $OPENSSL_CONF -key intermediate_ca/private/controller.key.pem -new -sha256 -out intermediate_ca/controller.csr -subj "/C=NL/ST=Amsterdam/L=CAmsterdam/O=OpenStack/OU=Octavia/CN=OctaviaController" -passin pass:${octavia_certificates_password}
+
+            # Create the client controller certificate
+            openssl ca -config $OPENSSL_CONF -name CA_intermediate -extensions usr_cert -days 7300 -notext -md sha256 -in intermediate_ca/controller.csr -out intermediate_ca/certs/controller.cert.pem -passin pass:${octavia_certificates_password} -batch
+
+            # Build the cancatenated client cert and key
+            openssl rsa -in intermediate_ca/private/controller.key.pem -out intermediate_ca/private/client.cert-and-key.pem -passin pass:${octavia_certificates_password}
+
+            cat intermediate_ca/certs/controller.cert.pem >> intermediate_ca/private/client.cert-and-key.pem
+
+            # We are done with the client CA
+            cd ..
+
+            ###### Stash the octavia default client CA cert files
+            cp client_ca/intermediate_ca/ca-chain.cert.pem etc/octavia/certs/client_ca.cert.pem
+            chmod 444 etc/octavia/certs/client_ca.cert.pem
+            cp client_ca/intermediate_ca/private/client.cert-and-key.pem etc/octavia/certs/client.cert-and-key.pem
+            chmod 600 etc/octavia/certs/client.cert-and-key.pem
+
+            ###### Server Root CA
+            mkdir server_ca
+            cd server_ca
+            mkdir certs crl newcerts private
+            chmod 700 private
+            touch index.txt
+            echo 1000 > serial
+
+            # Create the server CA private key
+            openssl genpkey -algorithm RSA -out private/ca.key.pem -aes-256-cbc -pass pass:${octavia_certificates_password}
+            chmod 400 private/ca.key.pem
+
+            # Create the server CA root certificate
+            openssl req -config $OPENSSL_CONF -key private/ca.key.pem -new -x509 -sha256 -extensions v3_ca -days 7300 -out certs/ca.cert.pem -subj "/C=NL/ST=Amsterdam/L=CAmsterdam/O=OpenStack/OU=Octavia/CN=ServerRootCA" -passin pass:${octavia_certificates_password}
+
+            ###### Server Intermediate CA
+            mkdir intermediate_ca
+            mkdir intermediate_ca/certs intermediate_ca/crl intermediate_ca/newcerts intermediate_ca/private
+            chmod 700 intermediate_ca/private
+            touch intermediate_ca/index.txt
+            echo 1000 > intermediate_ca/serial
+
+            # Create the server intermediate CA private key
+            openssl genpkey -algorithm RSA -out intermediate_ca/private/intermediate.ca.key.pem -aes-256-cbc -pass pass:${octavia_certificates_password}
+            chmod 400 intermediate_ca/private/intermediate.ca.key.pem
+
+            # Create the server intermediate CA certificate signing request
+            openssl req -config $OPENSSL_CONF -key intermediate_ca/private/intermediate.ca.key.pem -new -sha256 -out intermediate_ca/server_intermediate.csr -subj "/C=NL/ST=Amsterdam/L=CAmsterdam/O=OpenStack/OU=Octavia/CN=ServerIntermediateCA" -passin pass:${octavia_certificates_password}
+
+            # Create the server intermediate CA certificate
+            openssl ca -config $OPENSSL_CONF -name CA_intermediate -extensions v3_intermediate_ca -days 7300 -notext -md sha256 -in intermediate_ca/server_intermediate.csr -out intermediate_ca/certs/intermediate.cert.pem -passin pass:${octavia_certificates_password} -batch
+
+            # Create the server CA certificate chain
+            cat intermediate_ca/certs/intermediate.cert.pem certs/ca.cert.pem > intermediate_ca/ca-chain.cert.pem
+
+            # We are done with the server CA
+            cd ..
+
+            ###### Stash the octavia default server CA cert files
+            cp server_ca/intermediate_ca/ca-chain.cert.pem etc/octavia/certs/server_ca-chain.cert.pem
+            chmod 444 etc/octavia/certs/server_ca-chain.cert.pem
+            cp server_ca/intermediate_ca/certs/intermediate.cert.pem etc/octavia/certs/server_ca.cert.pem
+            chmod 400 etc/octavia/certs/server_ca.cert.pem
+            cp server_ca/intermediate_ca/private/intermediate.ca.key.pem etc/octavia/certs/server_ca.key.pem
+            chmod 400 etc/octavia/certs/server_ca.key.pem
+
+            ##### Validate the Octavia PKI files
+            set +x
+            echo "################# Verifying the Octavia files ###########################"
+            openssl verify -CAfile etc/octavia/certs/client_ca.cert.pem etc/octavia/certs/client.cert-and-key.pem
+            openssl verify -CAfile etc/octavia/certs/server_ca-chain.cert.pem etc/octavia/certs/server_ca.cert.pem
+
+            function trim_data() {
+              local data_path=$1
+              cat $data_path | base64 -w0 | tr -d '\n'
+            }
+
+            function create_secret() {
+              {
+              cat <<EOF
+            ---
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: octavia-certs
+            type: Opaque
+            data:
+              server_ca.cert.pem: $(trim_data  $TMPDIR/dual_ca/etc/octavia/certs/server_ca.cert.pem)
+              server_ca-chain.cert.pem: $(trim_data $TMPDIR/dual_ca/etc/octavia/certs/server_ca-chain.cert.pem)
+              server_ca.key.pem: $(trim_data $TMPDIR/dual_ca/etc/octavia/certs/server_ca.key.pem)
+              client_ca.cert.pem: $(trim_data $TMPDIR/dual_ca/etc/octavia/certs/client_ca.cert.pem)
+              client.cert-and-key.pem: $(trim_data $TMPDIR/dual_ca/etc/octavia/certs/client.cert-and-key.pem)
+            EOF
+              }| kubectl create --namespace "$NS" -f -
+            }
+
+            create_secret
+
+            #echo "[+] Done. Created secret: octavia-certs"
+            kubectl -n "$NS" describe secret octavia-certs
+      restartPolicy: Never
+  backoffLimit: 4

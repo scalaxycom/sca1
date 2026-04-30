@@ -1,0 +1,61 @@
+images:
+  pull_policy: IfNotPresent
+  tags:
+    placement: "quay.io/airshipit/placement:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_user: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_service: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_endpoints: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_drop: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    placement_db_sync: "quay.io/airshipit/placement:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    dep_check: "quay.io/airshipit/kubernetes-entrypoint:latest-${OPENSTACK_DIST}"
+    image_repo_sync: "docker.io/docker:17.07.0"
+dependencies:
+  static:
+    db_sync:
+      jobs:
+        - placement-db-init
+
+endpoints:
+  identity:
+    name: keystone
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      placement:
+        password: ${placement_admin_password} 
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      placement:
+        password: ${placement_db_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  placement:
+    host_fqdn_override:
+      public:
+        host: "placement.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            kind: ClusterIssuer
+            name: letsencrypt
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+secrets:
+  tls:
+    placement:
+      api:
+        public: ingress-cert
+
+
+
+pod:
+  replicas:
+    api: 3

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openstack-client
+  namespace: openstack  
+  labels:
+    app: openstack-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openstack-client
+  template:
+    metadata:
+      labels:
+        app: openstack-client
+    spec:
+      nodeSelector:
+        openstack-control-plane: enabled
+      containers:
+        - name: openstack-client
+          image: registry-1.docker.io/openstackhelm/openstack-client:2024.1
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              apt update
+              apt install bash-completion -y
+              mkdir -p /etc/bash_completion.d/
+              openstack complete > /etc/bash_completion.d/osc.bash_completion 
+              [[ $PS1 && -f /usr/share/bash-completion/bash_completion ]] && \
+                  . /usr/share/bash-completion/bash_completion
+              tee -a ~/.bashrc << 'BASHRC'
+              [[ -f /usr/share/bash-completion/bash_completion ]] && \
+                  . /usr/share/bash-completion/bash_completion
+              BASHRC
+              sleep infinity
+          tolerations:
+          - key: node-role.kubernetes.io/master
+            operator: Exists
+            effect: NoSchedule
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+          envFrom:
+            - secretRef:
+                name: keystone-keystone-admin

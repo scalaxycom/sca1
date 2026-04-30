@@ -1,0 +1,82 @@
+images:
+  tags:
+    db_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    cinder_db_sync: "quay.io/airshipit/cinder:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_drop: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_user: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_service: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_endpoints: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    cinder_api: "quay.io/airshipit/cinder:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    bootstrap: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    cinder_scheduler: "quay.io/airshipit/cinder:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    cinder_volume: "quay.io/airshipit/cinder:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    cinder_volume_usage_audit: "quay.io/airshipit/cinder:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    cinder_storage_init: "quay.io/airshipit/ceph-config-helper:latest-${OPENSTACK_DIST}"
+    cinder_backup: "quay.io/airshipit/cinder:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    cinder_backup_storage_init: "quay.io/airshipit/ceph-config-helper:latest-${OPENSTACK_DIST}"
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      cinder:
+        password: ${cinder_admin_password}
+      test:
+        password: ${cinder_test_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      cinder:
+        password: ${cinder_db_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      cinder:
+        password: ${cinder_rabbitmq_password}
+    statefulset:
+      replicas: 3
+  volumev3:
+    host_fqdn_override:
+      public:
+        host: "cinder.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            name: letsencrypt
+            kind: ClusterIssuer
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+            
+secrets:
+  tls:
+    volumev3:
+      api:
+        public: ingress-cert
+
+pod:
+  replicas:
+    api: 3
+    volume: 1
+    scheduler: 1
+    backup: 1
+
+# conf:
+#   cinder:
+#     DEFAULT:
+#       debug: true
+#       verbose: true
+
+# backup to internal ceph
+backup:
+  posix:
+    volume:
+      class_name: ceph-block

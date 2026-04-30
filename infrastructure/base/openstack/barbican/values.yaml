@@ -1,0 +1,56 @@
+images:
+  tags:
+    bootstrap: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    scripted_test: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    barbican_db_sync: "quay.io/airshipit/barbican:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_drop: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_user: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_service: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_endpoints: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    barbican_api: "quay.io/airshipit/barbican:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      barbican:
+        password: ${barbican_admin_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      barbican:
+        password: ${barbican_db_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      barbican:
+        password: ${barbican_rabbitmq_password}
+    statefulset:
+      replicas: 3
+  key_manager:
+    host_fqdn_override:
+      public:
+        host: "barbican.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            kind: ClusterIssuer
+            name: letsencrypt
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+secrets:
+  tls:
+    key_manager:
+      api:
+        public: ingress-cert

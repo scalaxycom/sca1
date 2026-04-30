@@ -1,0 +1,16 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Router
+metadata:
+  name: admin-router
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    description: Admin router
+    tags:
+      - admin
+    adminStateUp: true
+    externalGateways:
+      - networkRef: external-network

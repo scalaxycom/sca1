@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: octavia-worker-preconf
+  namespace: openstack
+spec:
+  template:
+    spec:
+      serviceAccountName: octavia-creator-sa
+      containers:
+      - name: generator
+        image: docker.io/bitnami/kubectl:latest
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            OSH_AMPHORA_SECGROUP_LIST=$(kubectl -n openstack get securitygroups.openstack.k-orc.cloud lb-mgmt-sec-grp --no-headers -o custom-columns=":status.id")
+            OSH_AMPHORA_FLAVOR_ID=$(kubectl -n openstack get flavor m1-amphora --no-headers -o custom-columns=":status.id")
+            OSH_AMPHORA_BOOT_NETWORK_LIST=$(kubectl -n openstack get network lb-mgmt-net --no-headers -o custom-columns=":status.id")
+            OSH_AMPHORA_IMAGE_OWNER_ID=$(kubectl -n openstack  exec -it $(kubectl -n openstack get pod -l "app=openstack-client" -o jsonpath='{.items[0].metadata.name}') -- openstack image show amphora-x64-haproxy-ubuntu-jammy -f value -c owner)
+            cat <<EOF | kubectl create -f -
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: octavia-worker-values
+              namespace: openstack
+            data:
+              values.yaml: |
+                conf:
+                  octavia:
+                    controller_worker:
+                      amp_image_owner_id: $OSH_AMPHORA_IMAGE_OWNER_ID
+                      amp_secgroup_list: $OSH_AMPHORA_SECGROUP_LIST
+                      amp_flavor_id: $OSH_AMPHORA_FLAVOR_ID
+                      amp_boot_network_list: $OSH_AMPHORA_BOOT_NETWORK_LIST
+            EOF
+      restartPolicy: Never
+  backoffLimit: 4

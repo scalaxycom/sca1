@@ -1,0 +1,37 @@
+
+images:
+  tags:
+    ks_user: quay.io/airshipit/openstack-client:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+
+endpoints:
+  postgresql:
+    auth:
+      admin:
+        password: ${postgresql_postgres_password}
+      exporter:
+        password: ${postgresql_db_exporter_password}
+      audit:
+        password: ${postgresql_db_audit_password}
+
+monitoring:
+  prometheus:
+    enabled: True
+    postgresql_exporter:
+      scrape: true
+
+volume:
+  backup:
+    enabled: true
+    class_name: openebs-hostpath
+    size: 5Gi
+
+storage:
+  pvc:
+    enabled: true
+    size: 5Gi
+    class_name: openebs-hostpath
+    class_path: volume.beta.kubernetes.io/storage-class
+  archive_pvc:
+    size: 5Gi
+    class_name: openebs-hostpath
+    class_path: volume.beta.kubernetes.io/storage-class

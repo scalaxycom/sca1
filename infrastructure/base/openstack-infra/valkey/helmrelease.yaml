@@ -1,0 +1,24 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: valkey
+spec:
+  releaseName: valkey
+  chart:
+    spec:
+      chart: valkey
+      version: ${valkey}
+      sourceRef:
+        kind: HelmRepository
+        name: valkey
+        namespace: openstack
+  dependsOn:
+    - name: openebs
+      namespace: openebs
+  interval: 1h0m0s
+  install:
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: valkey-values

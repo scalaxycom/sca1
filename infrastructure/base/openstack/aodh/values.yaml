@@ -1,0 +1,46 @@
+#pod:
+#  replicas:
+#    server: 1
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      aodh:
+        password: ${aodh_admin_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      aodh:
+        password: ${aodh_db_password}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      aodh:
+        password: ${aodh_rabbitmq_password}
+  alarming:
+    host_fqdn_override:
+      public:
+        host: "aodh.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            kind: ClusterIssuer
+            name: letsencrypt
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+secrets:
+  tls:
+    alarming:
+      api:
+        public: ingress-cert

@@ -1,0 +1,15 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Flavor
+metadata:
+  name: m1-amphora
+  namespace: openstack
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    name: m1.amphora
+    ram: 1024
+    disk: 3
+    vcpus: 1

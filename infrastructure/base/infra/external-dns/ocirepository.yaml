@@ -1,0 +1,9 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: external-dns
+spec:
+  interval: 1h
+  url: oci://ghcr.io/kubernetes-sigs/charts/external-dns
+  ref:
+    tag: 1.19.0

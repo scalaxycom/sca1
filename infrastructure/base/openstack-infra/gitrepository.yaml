@@ -1,0 +1,9 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: openstack-helm-infra
+spec:
+  interval: 5m0s
+  url: https://github.com/openstack/openstack-helm-infra.git  #https://opendev.org/openstack/openstack-helm-infra.git  
+  ref:
+    branch: master

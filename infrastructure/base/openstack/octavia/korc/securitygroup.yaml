@@ -1,0 +1,67 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: SecurityGroup
+metadata:
+  name: lb-mgmt-sec-grp
+  namespace: openstack  
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    description: Octavia management SecurityGroup
+    stateful: true
+    tags:
+      - octavia
+    rules:
+      - direction: ingress
+        protocol: tcp
+        ethertype: IPv4
+        portRange:
+          min: 22
+          max: 22
+      - direction: ingress
+        protocol: tcp
+        ethertype: IPv4
+        portRange:
+          min: 9443
+          max: 9443
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: SecurityGroup
+metadata:
+  name: lb-health-mgr-sec-grp
+  namespace: openstack  
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    description: Octavia health management SecurityGroup
+    stateful: true
+    tags:
+      - octavia
+    rules:
+      - direction: ingress
+        protocol: udp
+        ethertype: IPv4
+        portRange:
+          min: 5555
+          max: 5555
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: SecurityGroup
+metadata:
+  name: lb-worker-sec-grp
+  namespace: openstack  
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    description: Octavia worker SecurityGroup
+    stateful: true
+    tags:
+      - octavia

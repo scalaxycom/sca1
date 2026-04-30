@@ -1,0 +1,34 @@
+mayastor:
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+  etcd:
+    podAntiAffinityPreset: "soft"
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+
+localpv-provisioner:
+  hostpathClass:
+    isDefaultClass: true
+
+engines:
+  local:
+    lvm:
+      enabled: false
+    zfs:
+      enabled: false
+    rawfile:
+      # Disabled by default since rawfile is not marked as stable yet.
+      enabled: false
+  replicated:
+    mayastor:
+      enabled: false
+
+loki:
+  enabled: false
+
+alloy:
+  enabled: false

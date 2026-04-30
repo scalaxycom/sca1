@@ -1,0 +1,162 @@
+images:
+  tags:
+    bootstrap: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_drop: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_user: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_service: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_endpoints: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_api: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_cell_setup: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_cell_setup_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_compute: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_compute_ssh: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_conductor: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_db_sync: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_novncproxy: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_novncproxy_assets: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_scheduler: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_spiceproxy: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_spiceproxy_assets: "quay.io/airshipit/nova:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    nova_service_cleaner: "quay.io/airshipit/ceph-config-helper:latest-${OPENSTACK_DIST}"
+
+bootstrap:
+  wait_for_computes:
+    enabled: true 
+    
+conf:
+  ceph:
+    enabled: true 
+  nova:
+    DEFAULT:
+      debug: true
+      cpu_allocation_ratio: 8
+      ram_allocation_ratio: 5
+      metadata_workers: 2
+      osapi_compute_workers: 2
+      resume_guests_state_on_host_boot: true
+    neutron:
+      metadata_proxy_shared_secret: ${metadata_proxy_shared_secret}
+    barbican:
+      barbican_endpoint_type: internal
+    key_manager:
+      backend: barbican
+    keystone_authtoken:
+      auth_type: password
+      auth_version: v3
+      memcache_security_strategy: ENCRYPT
+      service_token_roles: service
+      service_token_roles_required: true
+      service_type: compute
+    libvirt:
+      virt_type: kvm
+      cpu_mode: host-passthrough
+    filter_scheduler:
+      enabled_filters: "ComputeFilter, AggregateTypeAffinityFilter, ComputeCapabilitiesFilter, PciPassthroughFilter, ImagePropertiesFilter, ServerGroupAntiAffinityFilter, ServerGroupAffinityFilter"
+      available_filters: "nova.scheduler.filters.all_filters"
+  logging:
+    logger_root:
+      handlers:
+        - stdout
+      level: DEBUG
+    logger_nova:
+      handlers:
+        - stdout
+      level: DEBUG
+# health_probe:
+#   logging:
+#     level: DEBUG
+
+endpoints:
+  identity:
+    name: keystone
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      nova:
+        password: ${nova_admin_password}
+      service:
+        password: ${nova_service_password}
+      cinder:
+        password: ${nova_cinder_password}
+      placement:
+        password: ${nova_placement_password}
+      neutron:
+        password: ${nova_neutron_password}
+      test:
+        password: ${nova_test_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      nova:
+        password: ${nova_db_password}
+  oslo_db_api:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      nova:
+        password: ${nova_db_password}
+  oslo_db_cell0:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      nova:
+        password: ${nova_db_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      nova:
+        password: ${nova_rabbitmq_password}
+    statefulset:
+      replicas: 3
+  compute:      
+    host_fqdn_override:
+      public:
+        host: "nova.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            name: letsencrypt
+            kind: ClusterIssuer
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+  compute_novnc_proxy:
+    host_fqdn_override:
+      public:
+        host: "novncproxy.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            name: letsencrypt
+            kind: ClusterIssuer
+    scheme:
+      public: https
+    port:
+      novnc_proxy:
+        public: 443
+
+secrets:
+  tls:
+    compute:
+      osapi:
+        public: ingress-cert
+    compute_novnc_proxy:
+      novncproxy:
+        public: ingress-cert
+
+pod:
+  enabled: true
+  replicas:
+    api_metadata: 3
+    osapi: 3
+    conductor: 3
+    scheduler: 3
+    novncproxy: 1

@@ -1,0 +1,37 @@
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Network
+metadata:
+  name: external-network
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: unmanaged
+  import:
+    filter:
+      name: external_network
+
+# apiVersion: openstack.k-orc.cloud/v1alpha1
+# kind: Network
+# metadata:
+#   name: external-network
+#   namespace: openstack  
+# spec:
+#   cloudCredentialsRef:
+#     cloudName: cloudname
+#     secretName: openstack-clouds
+#   managementPolicy: managed
+#   managedOptions:
+#     onDelete: detach
+#   resource:
+#     adminStateUp: true
+#     description: External network
+#     dnsDomain: "$HOST"
+#     external: true
+#     mtu: 1500
+#     portSecurityEnabled: true
+#     shared: true
+#     tags:
+#       - octavia
+#     projectRef: admin

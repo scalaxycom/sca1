@@ -1,0 +1,9 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: valkey
+spec:
+  interval: 1h
+  url: oci://ghcr.io/valkey-io/valkey-helm/valkey
+  ref:
+    tag: 0.7.6

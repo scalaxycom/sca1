@@ -1,0 +1,29 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: placement
+spec:
+  releaseName: placement
+  chart:
+    spec:
+      chart: placement
+      version: ${placement}
+      sourceRef:
+        kind: HelmRepository
+        name: openstack-helm
+        namespace: openstack
+  dependsOn:
+    - name: keystone
+    - name: cinder
+  install:
+    disableWait: true
+    disableWaitForJobs: true
+    remediation:
+      retries: 3
+  upgrade:
+    disableWait: true
+    disableWaitForJobs: true
+  interval: 1h0m0s
+  valuesFrom:
+    - kind: ConfigMap
+      name: placement-values

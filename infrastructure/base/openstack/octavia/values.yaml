@@ -1,0 +1,347 @@
+images:
+  tags:
+    bootstrap: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    db_init: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    octavia_db_sync: quay.io/airshipit/octavia:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    db_drop: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    rabbit_init: docker.io/rabbitmq:3.13-management
+    ks_user: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    ks_service: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    ks_endpoints: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    dep_check: quay.io/airshipit/kubernetes-entrypoint:latest-${OPENSTACK_DIST}
+    image_repo_sync: docker.io/docker:17.07.0
+    octavia_api: quay.io/airshipit/octavia:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    octavia_driver_agent: quay.io/airshipit/octavia:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    octavia_worker: quay.io/airshipit/octavia:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    octavia_worker_init: quay.io/airshipit/openstack-client:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    octavia_housekeeping: quay.io/airshipit/octavia:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    octavia_health_manager: quay.io/airshipit/octavia:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    octavia_health_manager_init: quay.io/airshipit/openstack-client:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    openvswitch_vswitchd: quay.io/airshipit/openvswitch:latest-${OPENSTACK_DIST}
+  pull_policy: "Always"
+
+conf:
+  octavia:
+    # DEFAULT:
+    #   debug: true
+    #   use_stderr: true
+    # api_settings:
+    #   default_provider_driver: 'amphorav2'
+    #   enabled_provider_drivers: "amphorav2:default,amphora:alias,octavia:deprecated"
+
+    #   jobboard_backend_driver: 'redis_taskflow_driver'
+    #   jobboard_backend_port: '6379'
+    #   jobboard_backend_hosts: 'openstack-redis-master.openstack.svc.cluster.local'
+    #   # update redis password
+    #   jobboard_backend_password: 'qwDfZzkLaYsPn6vCe4x5yR'
+    #   jobboard_backend_namespace: 'octavia_jobboard'
+    # cinder:
+    #   volume_size: 2
+    #   volume_type: rbd1
+    #   volume_create_retry_interval: 5
+    #   volume_create_timeout: 300
+    #   volume_create_max_retries: 5
+    controller_worker:
+      # amp_image_owner_id: ${OSH_AMPHORA_IMAGE_OWNER_ID}
+      # amp_secgroup_list: ${OSH_AMPHORA_SECGROUP_LIST}
+      # amp_flavor_id: ${OSH_AMPHORA_FLAVOR_ID}
+      # amp_boot_network_list: ${OSH_AMPHORA_BOOT_NETWORK_LIST}
+      loadbalancer_topology: 'ACTIVE_STANDBY'
+    health_manager:
+      bind_port: 5555
+      bind_ip: 0.0.0.0
+      controller_ip_port_list: ${CONTROLLER_IP_PORT_LIST}
+    task_flow:
+      jobboard_enabled: false
+    certificates:
+      endpoint_type: internalURL
+      ca_private_key_passphrase: ${octavia_certificates_password}
+    cinder:
+      endpoint_type: internalURL
+      valid_interfaces: internal
+    database:
+      connection_debug: 0
+      connection_recycle_time: 600
+      connection_trace: true
+      idle_timeout: 3600
+      mysql_sql_mode: {}
+      use_db_reconnect: true
+      pool_timeout: 60
+      max_retries: -1
+      max_overflow: 60
+      max_pool_size: 30
+    glance:
+      endpoint_type: internalURL
+      valid_interfaces: internal
+    keystone_authtoken:
+      service_token_roles: service
+      service_token_roles_required: true
+      auth_type: password
+      auth_version: v3
+      memcache_security_strategy: ENCRYPT
+      service_type: load-balancer
+      valid_interfaces: internal
+    neutron:
+      endpoint_type: internalURL
+      valid_interfaces: internal
+    nova:
+      enable_anti_affinity: "True"
+      endpoint_type: internalURL
+  octavia_api_uwsgi:
+    uwsgi:
+      wsgi-file: /var/lib/openstack/bin/octavia-wsgi
+pod:
+  replicas:
+    api: 1
+    worker: 1
+    housekeeping: 1
+  security_context:
+    octavia_worker:
+      container:
+        octavia_worker:
+          capabilities:
+            add:
+              - NET_ADMIN
+              - NET_RAW
+    octavia_health_manager:
+      container:
+        octavia_health_manager:
+          capabilities:
+            add:
+              - NET_ADMIN
+              - NET_RAW
+  mounts:
+    octavia_api:
+      octavia_api:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca.cert.pem
+            subPath: server_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca-chain.cert.pem
+            subPath: server_ca-chain.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/server_ca.key.pem
+            subPath: server_ca.key.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/client_ca.cert.pem
+            subPath: client_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/client.cert-and-key.pem
+            subPath: client.cert-and-key.pem
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0644
+    octavia_worker:
+      octavia_worker:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca.cert.pem
+            subPath: server_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca-chain.cert.pem
+            subPath: server_ca-chain.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/server_ca.key.pem
+            subPath: server_ca.key.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/client_ca.cert.pem
+            subPath: client_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/client.cert-and-key.pem
+            subPath: client.cert-and-key.pem
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0644
+    octavia_housekeeping:
+      octavia_housekeeping:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca.cert.pem
+            subPath: server_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca-chain.cert.pem
+            subPath: server_ca-chain.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/server_ca.key.pem
+            subPath: server_ca.key.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/client_ca.cert.pem
+            subPath: client_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/client.cert-and-key.pem
+            subPath: client.cert-and-key.pem
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0644
+    octavia_health_manager:
+      octavia_health_manager:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca.cert.pem
+            subPath: server_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca-chain.cert.pem
+            subPath: server_ca-chain.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/server_ca.key.pem
+            subPath: server_ca.key.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/client_ca.cert.pem
+            subPath: client_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/client.cert-and-key.pem
+            subPath: client.cert-and-key.pem
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0644
+    octavia_driver_agent:
+      octavia_driver_agent:
+        volumeMounts:
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca.cert.pem
+            subPath: server_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/server_ca-chain.cert.pem
+            subPath: server_ca-chain.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/server_ca.key.pem
+            subPath: server_ca.key.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/client_ca.cert.pem
+            subPath: client_ca.cert.pem
+          - name: octavia-certs
+            mountPath: /etc/octavia/certs/private/client.cert-and-key.pem
+            subPath: client.cert-and-key.pem
+        volumes:
+          - name: octavia-certs
+            secret:
+              secretName: octavia-certs
+              defaultMode: 0644
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      octavia:
+        password: ${octavia_admin_password}
+      test:
+        password: ${octavia_test_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      octavia:
+        password: ${octavia_db_password}
+  oslo_db_persistence:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      octavia:
+        password: ${octavia_db_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      octavia:
+        password: ${octavia_rabbitmq_password}
+    statefulset:
+      replicas: 3
+  valkey:
+    hosts:
+      default: valkey-primary
+    password: ${VALKEY_PASSWORD}
+  load_balancer:
+    host_fqdn_override:
+      public:
+        host: "octavia.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            name: letsencrypt
+            kind: ClusterIssuer
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+bootstrap:
+  enabled: true
+  ks_user: admin
+  script: |
+    openstack role create --or-show load-balancer_admin
+    openstack role create --or-show load-balancer_observer
+    openstack role create --or-show load-balancer_global_observer
+    openstack role create --or-show load-balancer_quota_admin
+    openstack role create --or-show load-balancer_member
+
+    openstack quota set admin \
+    --instances -1 \
+    --cores -1 \
+    --ram -1 \
+    --properties -1 \
+    --key-pairs -1 \
+    --server-groups -1 \
+    --server-group-members -1 \
+    --networks -1 \
+    --ports -1 \
+    --subnets -1 \
+    --routers -1 \
+    --floating-ips -1 \
+    --secgroups -1 \
+    --secgroup-rules -1 \
+    --rbac-policies -1 \
+    --volumes -1 \
+    --gigabytes -1 \
+    --snapshots -1 \
+    --backups -1 \
+    --backup-gigabytes -1 \
+    --force
+
+    for i in `openstack network agent list -f value -c "Agent Type" -c Host | awk '/L3/ {print $3}' | sort`; do
+    openstack port show octavia-health-manager-port-$i || \
+      openstack port set --device-owner Octavia:health-mgr --host=$i octavia-health-manager-port-$i \
+      openstack port show octavia-health-manager-port-$i -f value -c binding_host_id -c device_owner
+    openstack port show octavia-worker-port-$i || \
+      openstack port set --device-owner Octavia:worker --host=$i octavia-worker-port-$i \
+      openstack port show octavia-worker-port-$i -f value -c binding_host_id -c device_owner
+    done
+
+    openstack keypair show octavia_ssh_key || \
+      openstack keypair create --private-key /tmp/octavia_key octavia_ssh_key && \
+      export TOKEN=$(openstack token issue -f value -c id) && \
+      export KEY=$(cat /tmp/octavia_key |sed ':a;N;$!ba;s/\\/\\\\/g;s/"/\\"/g;s/\n/\\n/g') && \
+      curl -X POST \
+        -H "content-type:application/json" \
+        -H "X-Auth-Token: $TOKEN" \
+        -d "{\"name\": \"octavia_ssh_key\", \"payload\": \"$KEY\", \"payload_content_type\": \"text/plain\"}" \
+        http://barbican.openstack.svc.cluster.local/v1/secrets 
+
+    openstack network show external_network || \
+      openstack network create --share --external --provider-physical-network external --provider-segment ${EXTERTAL_NETWORK_VLAN} --provider-network-type vlan external_network
+
+    openstack subnet show external_subnet1 || \
+      openstack subnet create --no-dhcp \
+      --allocation-pool "start=${EXTERTAL_NETWORK_START},end=${EXTERNAL_NETWORK_END}" \
+      --network external_network --subnet-range "${EXTERTAL_NETWORK_RANGE}" \
+      --gateway ${EXTERTAL_NETWORK_GW} external_subnet1
+
+secrets:
+  tls:
+    load_balancer:
+      api:
+        public: ingress-cert
+

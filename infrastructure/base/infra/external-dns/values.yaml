@@ -1,0 +1,17 @@
+provider: cloudflare
+cloudflare:
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-api-token-secret
+        key: api-token
+domainFilters:
+  - "${DOMAIN}"
+txtOwnerId: "${CN}-external-dns"
+sources:
+ - ingress
+extraArgs:
+  force-default-targets: null
+  default-targets:
+  - ${KUBE_VIP_EXTERNAL_IP}

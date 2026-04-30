@@ -1,0 +1,49 @@
+images:
+  tags:
+    prometheus_mysql_exporter_helm_tests: quay.io/airshipit/openstack-client:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+
+endpoints:
+  identity:
+    name: backup-storage-auth
+    namespace: openstack
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      mariadb:
+        password: ${mariadb_backup_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      sst:
+        password: ${mariadb_sst_password}
+      audit:
+        password: ${mariadb_audit_password}
+      exporter:
+        password: ${mariadb_exporter_password}
+
+
+conf:
+  backup:
+    enabled: true
+    remote_backup:
+      enabled: true
+
+monitoring:
+  prometheus:
+    enabled: True
+
+volume:
+  enabled: true
+  class_name: default
+  size: 5Gi
+  backup:
+    enabled: true
+    class_name: openebs-hostpath
+    size: 5Gi
+
+manifests:
+  cron_job_mariadb_backup:  true
+  pvc_backup: true
+  secret_backup_restore: true
+  job_ks_user: true

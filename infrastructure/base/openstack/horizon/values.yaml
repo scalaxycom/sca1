@@ -1,0 +1,81 @@
+images:
+  tags:
+    db_init: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    db_drop: quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    horizon_db_sync: quay.io/airshipit/horizon:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+    horizon: quay.io/airshipit/horizon:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+
+#pod:
+#  replicas:
+#    server: 1
+
+conf:
+  horizon:
+    local_settings:
+      config:
+        use_ssl: "False"
+        csrf_cookie_secure: "True"
+        csrf_cookie_httponly: "True"
+        enforce_password_check: "True"
+        session_cookie_secure: "True"
+        session_cookie_httponly: "True"
+        secure_proxy_ssl_header: "True"
+        csrf_trusted_origins: 
+          - https://horizon.${HOST}
+        openstack_neutron_network:
+          enable_router: "True"
+          enable_quotas: "True"
+          enable_ipv6: "False"
+          enable_distributed_router: "False"
+          enable_ha_router: "True"
+          enable_lb: "True"
+          enable_firewall: "True"
+          enable_vpn: "True"
+          enable_fip_topology_check: "True"
+    extra_panels:
+      - designatedashboard
+      - heat_dashboard
+      - ironic_ui
+      - magnum_ui
+      - manila_ui
+      - monitoring
+      - neutron_vpnaas_dashboard
+      - octavia_dashboard
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+  dashboard:
+    host_fqdn_override:
+      public:
+        host: "horizon.${HOST}" 
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            name: letsencrypt
+            kind: ClusterIssuer  
+    # scheme:
+    #   public: https
+    # port:
+    #   web:
+    #     public: 443
+
+secrets:
+  tls:
+    dashboard:
+      dashboard:
+        public: ingress-cert
+
+network:
+  dashboard:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/backend-protocol: "http"
+        nginx.ingress.kubernetes.io/secure-backends: "false"
+        nginx.ingress.kubernetes.io/x-forwarded-proto: "https"

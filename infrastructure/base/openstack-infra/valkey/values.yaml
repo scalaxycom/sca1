@@ -1,0 +1,28 @@
+auth:
+  enabled: true
+  aclUsers:
+    default:
+      permissions: "~* &* +@all"
+      password: "${VALKEY_PASSWORD}"
+
+replicaCount: 1
+
+dataStorage:
+  enabled: true
+  className: openebs-hostpath
+  requestedSize: 5Gi
+  accessModes:
+    - ReadWriteOnce
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 96Mi
+
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false

@@ -1,0 +1,30 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cinder
+spec:
+  releaseName: cinder
+  chart:
+    spec:
+      chart: cinder
+      version: ${cinder}
+      sourceRef:
+        kind: HelmRepository
+        name: openstack-helm
+        namespace: openstack
+  dependsOn:
+    - name: ceph-adapter-rook
+    - name: keystone
+    - name: glance
+  install:
+    disableWait: true
+    disableWaitForJobs: true
+    remediation:
+      retries: 3
+  upgrade:
+    disableWait: true
+    disableWaitForJobs: true
+  interval: 1h0m0s
+  valuesFrom:
+    - kind: ConfigMap
+      name: cinder-values

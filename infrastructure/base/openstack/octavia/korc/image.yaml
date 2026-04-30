@@ -1,0 +1,24 @@
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Image
+metadata:
+  name: amphora-2024.1
+  namespace: openstack
+spec:
+  cloudCredentialsRef:
+    cloudName: cloudname
+    secretName: openstack-clouds
+  managementPolicy: managed
+  managedOptions:
+    onDelete: detach
+  resource:
+    name: amphora-x64-haproxy-ubuntu-jammy
+    content:
+      diskFormat: qcow2
+      download:
+        url: https://nbg1.your-objectstorage.com/osism/openstack-octavia-amphora-image/octavia-amphora-haproxy-2024.1.qcow2
+        hash:
+          algorithm: sha256
+          value: 4c8f885779148345661923ae527b7d0e3175f30f9d5bdfa39801f327ec348d95
+    visibility: public
+    tags: 
+    - amphora

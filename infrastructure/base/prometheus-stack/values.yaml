@@ -1,0 +1,434 @@
+prometheus:
+  enabled: true
+  thanosService:
+    enabled: true
+  thanosServiceMonitor:
+    enabled: true
+  prometheusSpec:
+    externalUrl: "https://prometheus.${HOST}"
+    # Prometheus metrics retention time in PV
+    retention: 1d
+    # High availability
+    replicas: 2 
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    enableRemoteWriteReceiver: true
+#    serviceMonitorSelector:
+#      matchLabels:
+#        release: prometheus-stack
+#    serviceMonitorNamespaceSelector:
+#      matchNames:
+#        - stage
+    thanos:
+      objectStorageConfig: 
+        secret:
+          type: "${THANOS_STORAGE_TYPE}"
+          config: 
+            endpoint: "${THANOS_ENDPOINT}"
+            bucket: "${THANOS_BUCKET}"
+            access_key: "${THANOS_ACCESS_KEY_ID}"
+            secret_key: "${THANOS_ACCESS_SECRET_KEY}"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 30Gi
+
+  additionalServiceMonitors:
+    - name: "billing-admin"
+      selector:
+        matchLabels:
+          release: billing-admin
+      namespaceSelector:
+        matchNames:
+          - stage
+      endpoints:
+       - port: http
+         path: /metrics
+         interval: 30s
+    - name: "billing-backend"
+      selector:
+        matchLabels:
+          release: billing-backend
+      namespaceSelector:
+        matchNames:
+          - stage
+      endpoints:
+        - port: http
+          path: /metrics
+          interval: 30s
+#    - name: billing-admin-metrics
+#      additionalLabels:
+#        release: prometheus-stack
+#      namespaceSelector:
+#        matchNames:
+#          - stage
+#      selector:
+#        matchLabels:
+#          release: billing-admin
+#      endpoints:
+#        - port: 80
+#          path: /metrics
+#          interval: 30s
+#          scrapeTimeout: 10s
+
+prometheusOperator:
+  enabled: "True"
+  thanosImage:
+    registry: quay.io
+    repository: thanos/thanos
+    tag: v0.37.2
+
+prometheus-node-exporter:
+  extraArgs:
+    - --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+)($|/)
+    - --collector.filesystem.ignored-fs-types=^(autofs|binfmt_misc|cgroup|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|sysfs|tracefs)$
+
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeApiserver: false
+    kubeApiserverAvailability: false
+    kubeApiserverSlos: false
+    kubeProxy: false
+  disabled:
+    KubeVersionMismatch: true
+    KubeAPIErrorBudgetBurn: true
+    KubeJobCompletion: true
+    KubeHpaMaxedOut: true
+
+#Scraping components - disabled what is controlled by AKS.
+kubeControllerManager:
+  enabled: false
+coreDns:
+  enabled: false
+kubeDns:
+  enabled: true
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+  service:
+    selector:
+      component: kube-proxy
+      tier: node
+alertmanager:
+  alertmanagerSpec:
+    externalUrl: "https://alertmanager.${HOST}"
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'service', 'severity']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'telegram'
+      routes:
+        - match:
+            alertname: Watchdog
+          receiver: 'null'
+        - match:
+            alertname: 'InfoInhibitor'
+          receiver: 'null'
+        - matchers:
+            - "alertname = CPUThrottlingHigh"
+          receiver: 'null'
+        # Send to null until those are optimized
+        - matchers:
+            - "alertname = IstioLowTotalRequestRate"
+          receiver: 'null'
+        - matchers:
+            - "alertname = IstioHighRequestLatency"
+          receiver: 'null'
+        - matchers:
+            - "alertname = IstioLatency99Percentile"
+          receiver: 'null'
+        - matchers:
+            - "alertname = IstioHigh4xxErrorRate"
+          receiver: 'null'
+        - matchers:
+            - "alertname = IstioPilotDuplicateEntry"
+        - matchers:
+            - "severity = none"
+          receiver: 'null'
+    inhibit_rules:
+      - source_matchers:
+          - "severity = critical"
+        target_matchers:
+          - "severity = warning|critical|info"
+        # Apply inhibition if the alertname is the same.
+        equal: ['alertname', 'service']
+    receivers:
+      - name: 'null'
+      - name: 'telegram'
+        telegram_configs:
+        - bot_token: "${TELEGRAM_BOT_TOKEN}"
+          api_url: https://api.telegram.org
+          chat_id: -${TELEGRAM_CHAT_ID}
+          parse_mode: ''
+
+grafana:
+  sidecar:
+    datasources:
+      url: http://thanos-query-frontend.monitoring:9090
+      access: proxy
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki-gateway.loki
+      access: proxy
+      isDefault: false
+      uid: loki
+      jsonData:
+        timeout: 3600
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      access: proxy
+      url: http://tempo-query-frontend.observability:3100
+      jsonData:
+        serviceMap:
+          datasourceUid: 'prometheus'
+        nodeGraph:
+          enabled: true
+        lokiSearch:
+          datasourceUid: 'loki'
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+        - name: 'istio'
+          orgId: 1
+          folder: 'Istio'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/istio
+  dashboards:
+    default:
+      loki-stats:
+        gnetId: 14055
+        revision: 5
+        datasource: 
+        - name: DS_PROMETHEUS
+          value: Prometheus
+        - name: DS_LOKI
+          value: Loki
+    istio:
+      istio-control-plane:
+        gnetId: 7645
+        revision: 114
+        datasource: Prometheus
+      istio-:
+        gnetId: 7639
+        revision: 114
+        datasource: Prometheus
+      istio-service:
+        gnetId: 7636
+        revision: 43
+        datasource: Prometheus
+      istio-workload:
+        gnetId: 7630
+        revision: 114
+        datasource: Prometheus
+      istio-performance:
+        gnetId: 11829
+        revision: 114
+        datasource: Prometheus
+  adminUser: "${GRAFANA_ADMIN_USER}"
+  adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
+  auth:
+    anonymous:
+      enabled: "false"
+  assertNoLeakedSecrets: false
+
+  grafana.ini:
+    server:
+      root_url: https://grafana.${HOST}/
+    auth:
+      disable_login_form: "false"
+    # auth.google:
+    #   enabled: true
+    #   allow_sign_up: true
+    #   auto_login: true
+    #   scopes: openid email profile
+    #   auth_url: https://accounts.google.com/o/oauth2/v2/auth
+    #   token_url: https://oauth2.googleapis.com/token
+    #   api_url: https://openidconnect.googleapis.com/v1/userinfo
+    #   allow_assign_grafana_admin: true
+    #   role_attribute_path: email=='devops@${DOMAIN}' && 'GrafanaAdmin' || 'Viewer'
+    #   skip_org_role_sync: false
+    #   allowed_domains: = ${DOMAIN} ${HOST} ${OAUTH2_EMAIL_DOMAIN}
+    #   client_id: ${GRAFANA_AUTH_CLIENT_ID}
+    #   client_secret: ${GRAFANA_AUTH_CLIENT_SECRET}
+    #   use_pkce: true
+    users:
+      viewers_can_edit: "True"
+     # auto_assign_org_role: 'Editor'
+
+additionalPrometheusRulesMap:
+  rule-name:
+    groups:
+      - name: custom.rules
+        rules:
+          - alert: KubeJobCompletion
+            annotations:
+              description: 'Job {{`{{`}} $labels.namespace {{`}}`}}/{{`{{`}} $labels.job_name {{`}}`}} is taking more than 12 hours to complete.'
+              runbook_url: 'https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubejobcompletion'
+              summary: Job did not complete in time
+            expr: kube_job_spec_completions{job="kube-state-metrics", namespace=~"{{ $targetNamespace }}"} - kube_job_status_succeeded{job="kube-state-metrics", namespace=~"{{ $targetNamespace }}"}  > 0
+            for: 24h
+            labels:
+              severity: warning
+          - alert: KubeHpaMaxedOut
+            annotations:
+              description: 'HPA {{`{{`}} $labels.namespace {{`}}`}}/{{`{{`}} $labels.horizontalpodautoscaler  {{`}}`}} has been running at max replicas for longer than 15 minutes.'
+              runbook_url: 'https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubehpamaxedout'
+              summary: HPA is running at max replicas
+            expr: |-
+              kube_horizontalpodautoscaler_status_current_replicas{job="kube-state-metrics", namespace=~"{{ $targetNamespace }}"}
+                ==
+              kube_horizontalpodautoscaler_spec_max_replicas{job="kube-state-metrics", namespace=~"{{ $targetNamespace }}"}
+            for: 1h
+            labels:
+              severity: warning
+
+      # Istio alert rules:
+      - name: custom.istio.rules
+        rules:
+          - alert: IstioKubernetesGatewayAvailabilityDrop
+            expr: min(kube_deployment_status_replicas_available{deployment="istio-ingress", namespace="istio-ingress"}) without (instance, pod) < 2
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio Kubernetes gateway availability drop (instance {{ $labels.instance }})
+              description: "Gateway pods have dropped. Inbound traffic will likely be affected.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioPilotHighTotalRequestRate
+            expr: sum(rate(pilot_xds_push_errors[1m])) / sum(rate(pilot_xds_pushes[1m])) * 100 > 5
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio Pilot high total request rate (instance {{ $labels.instance }})
+              description: "Number of Istio Pilot push errors is too high (> 5%). Envoy sidecars might have outdated configuration.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioMixerPrometheusDispatchesLow
+            expr: sum(rate(mixer_runtime_dispatches_total{adapter=~"prometheus"}[1m])) < 180
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio Mixer Prometheus dispatches low (instance {{ $labels.instance }})
+              description: "Number of Mixer dispatches to Prometheus is too low. Istio metrics might not be being exported properly.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioHighTotalRequestRate
+            expr: sum(rate(istio_requests_total{reporter="destination"}[5m])) > 1000
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio high total request rate (instance {{ $labels.instance }})
+              description: "Global request rate in the service mesh is unusually high.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioLowTotalRequestRate
+            expr: sum(rate(istio_requests_total{reporter="destination"}[5m])) < 100
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio low total request rate (instance {{ $labels.instance }})
+              description: "Global request rate in the service mesh is unusually low.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioHigh4xxErrorRate
+            expr: sum(rate(istio_requests_total{reporter="destination", response_code=~"4.*"}[5m])) / sum(rate(istio_requests_total{reporter="destination"}[5m])) * 100 > 10
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio high 4xx error rate (instance {{ $labels.instance }})
+              description: "High percentage of HTTP 4xx responses in Istio (> 10%).\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioHigh5xxErrorRate
+            expr: sum(rate(istio_requests_total{reporter="destination", response_code=~"5.*"}[5m])) / sum(rate(istio_requests_total{reporter="destination"}[5m])) * 100 > 10
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio high 5xx error rate (instance {{ $labels.instance }})
+              description: "High percentage of HTTP 5xx responses in Istio (> 10%).\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioHighRequestLatency
+            expr: rate(istio_request_duration_milliseconds_sum[1m]) / rate(istio_request_duration_milliseconds_count[1m]) > 0.1
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio high request latency (instance {{ $labels.instance }})
+              description: "Istio average requests execution is longer than 100ms.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioLatency99Percentile
+            expr: histogram_quantile(0.99, rate(istio_request_duration_milliseconds_bucket[1m])) > 1
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: Istio latency 99 percentile (instance {{ $labels.instance }})
+              description: "Istio 1% slowest requests are longer than 1s.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+          - alert: IstioPilotDuplicateEntry
+            expr: sum(rate(pilot_duplicate_envoy_clusters{}[5m])) > 0
+            for: 0m
+            labels:
+              severity: critical
+            annotations:
+              summary: Istio Pilot Duplicate Entry (instance {{ $labels.instance }})
+              description: "Istio pilot duplicate entry error.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      # Velero alert rules:
+      - name: custom.velero.rules
+        rules:
+          - alert: VeleroBackupPartialFailures
+            annotations:
+              message: Velero backup {{ $labels.schedule }} has {{ $value | humanizePercentage }} partialy failed backups.
+            expr: |-
+              velero_backup_partial_failure_total{schedule!=""} / velero_backup_attempt_total{schedule!=""} > 0.25
+            for: 15m
+            labels:
+              severity: warning
+          - alert: VeleroBackupFailures
+            annotations:
+              message: Velero backup {{ $labels.schedule }} has {{ $value | humanizePercentage }} failed backups.
+            expr: |-
+              velero_backup_failure_total{schedule!=""} / velero_backup_attempt_total{schedule!=""} > 0.25
+            for: 15m
+            labels:
+              severity: warning
+
+      # Fluxcd alert rules:
+      - name: custom.flux.rules
+        rules:
+          - alert: ReconciliationFailure
+            expr: max(gotk_reconcile_condition{status="False",type="Ready"}) by (exported_namespace, name, kind) + on(exported_namespace, name, kind) (max(gotk_reconcile_condition{status="Deleted"}) by (exported_namespace, name, kind)) * 2 == 1
+            for: 10m
+            labels:
+              severity: page
+            annotations:
+              summary: '{{ $labels.kind }} {{ $labels.exported_namespace }}/{{ $labels.name }} reconciliation has been failing for more than ten minutes.'

@@ -1,0 +1,102 @@
+images:
+  tags:
+    bootstrap: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_init: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    db_drop: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_user: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_service: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    ks_endpoints: "quay.io/airshipit/heat:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_db_sync: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_dhcp: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_l3: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_l2gw: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_linuxbridge_agent: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_metadata: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_ovn_metadata: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_openvswitch_agent: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_server: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_rpc_server: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_bagpipe_bgp: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+    neutron_netns_cleanup_cron: "quay.io/airshipit/neutron:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}"
+
+pod:
+  replicas:
+    server: 3
+
+conf:
+  neutron:
+    DEFAULT:
+      global_physnet_mtu: 9000
+      max_l3_agents_per_router: 3
+      dhcp_agents_per_network: 3
+  metadata_agent:
+    DEFAULT:
+      metadata_proxy_shared_secret: ${metadata_proxy_shared_secret}
+  # <provider_interface_name> will be attached to the br-ex bridge.
+  # The IP assigned to the interface will be moved to the bridge.
+  auto_bridge_add:
+    br-ex: bond0
+  plugins:
+    ml2_conf:
+      ml2:
+        path_mtu: 1550
+      ml2_type_vlan:
+        network_vlan_ranges: "external:${VLAN_MIN}:${VLAN_MAX}"
+
+# health_probe:
+#   logging:
+#     level: DEBUG
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      neutron:
+        password: ${neutron_admin_password}
+      nova:
+        password: ${neutron_nova_password}
+      placement:
+        password: ${neutron_placement_password}
+      designate:
+        password: ${neutron_designate_password}
+      test:
+        password: ${neutron_test_password}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      neutron:
+        password: ${neutron_db_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_messaging:
+    auth:
+      admin:
+        password: ${rabbitmq_admin_password}
+      neutron:
+        password: ${neutron_rabbitmq_password}
+    statefulset:
+      replicas: 3
+  network:
+    host_fqdn_override:
+      public:
+        host: "neutron.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            name: letsencrypt
+            kind: ClusterIssuer
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+            
+secrets:
+  tls:
+    network:
+      server:
+        public: ingress-cert
+

@@ -1,0 +1,12 @@
+images:
+  tags:
+    libvirt: docker.io/openstackhelm/libvirt:${OPENSTACK_RELEASE}-${OPENSTACK_DIST}
+labels:
+  agent:
+    libvirt:
+      node_selector_key: openstack-compute-node
+      node_selector_value: enabled
+
+conf:
+  ceph:
+    enabled: true

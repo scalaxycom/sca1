@@ -1,0 +1,131 @@
+images:
+  tags:
+    db_init: "quay.io/rackspace/rackerlabs-gnocchi:2024.1-ubuntu_jammy"
+    db_init_indexer: "quay.io/rackspace/rackerlabs-postgres:14.5"
+    db_sync: "quay.io/rackspace/rackerlabs-gnocchi:2024.1-ubuntu_jammy"
+    dep_check: "ghcr.io/rackerlabs/genestack-images/kubernetes-entrypoint:latest"
+    gnocchi_api: "quay.io/rackspace/rackerlabs-gnocchi:2024.1-ubuntu_jammy"
+    gnocchi_metricd: "quay.io/rackspace/rackerlabs-gnocchi:2024.1-ubuntu_jammy"
+    gnocchi_resources_cleaner: "quay.io/rackspace/rackerlabs-gnocchi:2024.1-ubuntu_jammy"
+    gnocchi_statsd: "quay.io/rackspace/rackerlabs-gnocchi:2024.1-ubuntu_jammy"
+    gnocchi_storage_init: "quay.io/rackspace/rackerlabs-ceph-config-helper:latest-ubuntu_jammy"
+    image_repo_sync: null
+    ks_endpoints: "ghcr.io/rackerlabs/genestack-images/heat:2024.1-latest"
+    ks_service: "ghcr.io/rackerlabs/genestack-images/heat:2024.1-latest"
+    ks_user: "ghcr.io/rackerlabs/genestack-images/heat:2024.1-latest"
+
+#pod:
+#  replicas:
+#    server: 1
+
+conf:
+  apache: |
+    Listen 0.0.0.0:{{ tuple "metric" "internal" "api" . | include
+    "helm-toolkit.endpoints.endpoint_port_lookup" }}
+    SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
+    CustomLog /dev/stdout combined env=!forwarded
+    CustomLog /dev/stdout proxy env=forwarded
+    <VirtualHost *:{{ tuple "metric" "internal" "api" . | include
+    "helm-toolkit.endpoints.endpoint_port_lookup" }}>
+        WSGIDaemonProcess gnocchi processes={{ .Values.conf.gnocchi_api_wsgi.wsgi.processes }} threads={{ .Values.conf.gnocchi_api_wsgi.wsgi.threads }} user=gnocchi group=gnocchi display-name=%{GROUP}
+        WSGIProcessGroup gnocchi
+        WSGIScriptAlias / "/usr/local/lib/python3.10/dist-packages/gnocchi/rest/wsgi.py"
+        WSGIApplicationGroup %{GLOBAL}
+        ErrorLog /dev/stderr
+        SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
+        CustomLog /dev/stdout combined env=!forwarded
+        CustomLog /dev/stdout proxy env=forwarded
+        <Directory "/usr/local/lib/python3.10/dist-packages/gnocchi/rest">
+              Require all granted
+        </Directory>
+    </VirtualHost>
+  gnocchi:
+    metricd:
+      workers: 2
+  gnocchi_api_wsgi:
+    wsgi:
+      processes: 2
+      threads: 1
+  paste:
+    "app:gnocchiv1":
+      paste.app_factory: "gnocchi.rest.app:app_factory"
+      root: gnocchi.rest.api.V1Controller
+    "app:gnocchiversions":
+      paste.app_factory: "gnocchi.rest.app:app_factory"
+      root: gnocchi.rest.api.VersionsController
+    "app:healthcheck":
+      oslo_config_project: gnocchi
+      use: "egg:oslo.middleware#healthcheck"
+    "composite:gnocchi+basic":
+      /: gnocchiversions_pipeline
+      /healthcheck: healthcheck
+      /v1: gnocchiv1+noauth
+      use: "egg:Paste#urlmap"
+    "composite:gnocchi+keystone":
+      /: gnocchiversions_pipeline
+      /healthcheck: healthcheck
+      /v1: gnocchiv1+keystone
+      use: "egg:Paste#urlmap"
+    "composite:gnocchi+remoteuser":
+      /: gnocchiversions_pipeline
+      /healthcheck: healthcheck
+      /v1: gnocchiv1+noauth
+      use: "egg:Paste#urlmap"
+    "filter:keystone_authtoken":
+      oslo_config_project: gnocchi
+      use: "egg:keystonemiddleware#auth_token"
+    "pipeline:gnocchiv1+keystone":
+      pipeline: keystone_authtoken gnocchiv1
+    "pipeline:gnocchiv1+noauth":
+      pipeline: gnocchiv1
+    "pipeline:gnocchiversions_pipeline":
+      pipeline: gnocchiversions
+    "pipeline:main":
+      pipeline: gnocchi+keystone
+  policy:
+    admin_or_creator: "role:admin or project_id:%(created_by_project_id)s"
+    context_is_admin: "role:admin"
+    update archive policy rule: "role:admin"
+
+endpoints:
+  identity:
+    auth:
+      admin:
+        password: ${keystone_admin_password}
+      gnocchi:
+        password: ${gnocchi_admin_password}
+  oslo_cache:
+    auth:
+      memcache_secret_key: ${memcache_secret_key}
+  oslo_db:
+    auth:
+      admin:
+        password: ${mariadb_root_password}
+      gnocchi:
+        password: ${gnocchi_db_password}
+  oslo_db_postgresql:
+    auth:
+      admin:
+        password: ${postgresql_postgres_password}
+      gnocchi:
+        password: ${gnocchi_pgsql_password}
+  metric:
+    host_fqdn_override:
+      public:
+        host: "gnocchi.${HOST}"
+        tls:
+          secretName: ingress-cert
+          issuerRef:
+            kind: ClusterIssuer
+            name: letsencrypt
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+
+secrets:
+  tls:
+    metric:
+      api:
+        public: ingress-cert

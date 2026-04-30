@@ -1,0 +1,22 @@
+images:
+  tags:
+
+conf:
+  galera:
+    enabled: true
+pod:
+  replicas:
+    server: 3
+
+volume:
+  enabled: true
+  class_name: default
+  size: 5Gi
+  backup:
+    enabled: true
+    class_name: default
+    size: 5Gi
+  galera:
+    enabled: true
+    class_name: default
+    size: 300Mi

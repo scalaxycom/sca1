@@ -1,0 +1,25 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: keystone
+spec:
+  releaseName: keystone
+  chart:
+    spec:
+      chart: keystone
+      version: ${keystone}
+      sourceRef:
+        kind: HelmRepository
+        name: openstack-helm
+        namespace: openstack
+  dependsOn:
+    - name: mariadb
+    - name: rabbitmq
+    - name: memcached
+  interval: 1h0m0s
+  install:
+    remediation:
+      retries: 3
+  valuesFrom:
+    - kind: ConfigMap
+      name: keystone-values
